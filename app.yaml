@@ -1,0 +1,13 @@
+runtime: python312
+
+env_variables:
+  INSTANCE_CONNECTION_NAME: "systems-design-assignment:europe-west2:restaurantapp"
+  GOOGLE_CLOUD_PROJECT: "systems-design-assignment"
+
+entrypoint: gunicorn -b :$PORT main:app
+
+handlers:
+  - url: /static
+    static_dir: static
+  - url: /.*
+    script: auto
