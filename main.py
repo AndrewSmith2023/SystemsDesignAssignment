@@ -1,4 +1,4 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request
 from db import mysql_engine, mongo_db
 from sqlalchemy import text
 
@@ -44,6 +44,78 @@ def get_menu():
             "success": True,
             "menu": menu_items
         })
+
+    except Exception as e:
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route("/api/order", methods=["POST"])
+def create_order():
+    try:
+        data = request.get_json()
+        user_id = data.get("user_id")
+        items = data.get("items", [])
+
+        if not user_id or not items:
+            return jsonify({
+                "success": False,
+                "error": "Invalid request data"
+            }), 400
+        
+        conn = mysql_engine.connect()
+        
+        insert_order = text("""
+                INSERT INTO orders (user_id, total, status)
+                VALUES (:user_id, 0, 'pending')
+        """)
+
+        result = conn.execute(insert_order, {"user_id": user_id})
+        order_id = result.lastrowid
+
+        total_price = 0
+        for item in items:
+            menu_id = item["menu_id"]
+            quantity = item["quantity"]
+
+            price_query = text("SELECT price FROM menu WHERE id = :menu_id")
+            price_row = conn.execute(price_query, {"menu_id": menu_id}).fetchone()
+
+            if not price_row:
+                continue
+
+            price = float(price_row[0])
+            total_price += price * quantity
+
+            insert_item = text("""
+                INSERT INTO order_items (order_id, menu_id, quantity)
+                VALUES (:order_id, :menu_id, :quantity)
+            """)
+            conn.execute(insert_item, {
+                "order_id": order_id,
+                "menu_id": menu_id,
+                "quantity": quantity
+            })
+
+        update_total = text("""
+            UPDATE orders SET total = :total WHERE id = :order_id
+        """)
+        conn.execute(update_total, {"total": total_price, "order_id": order_id})
+
+        conn.close
+
+        mongo_db["order_logs"].insert_one({
+            "order_id": order_id,
+            "user_id": user_id,
+            "items": items,
+        })
+
+        return jsonify({
+            "success": True,
+            "order_id": order_id
+        })
+
 
     except Exception as e:
         return jsonify({
