@@ -1,43 +1,77 @@
-from flask import Flask, render_template, jsonify, request
+import os
+from flask import Flask, render_template, jsonify, request, session, redirect, make_response
+import firebase_admin
+from firebase_admin import auth as fb_auth, credentials
 from db import mysql_engine, mongo_db
 from sqlalchemy import text
+from google.cloud import secretmanager
+import json
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-not-for-prod")
+
+
+def get_secret(name: str) -> str:
+    project_id = os.environ["GOOGLE_CLOUD_PROJECT"]
+    client = secretmanager.SecretManagerServiceClient()
+    secret_path = f"projects/{project_id}/secrets/{name}/versions/latest"
+    return client.access_secret_version(
+        request={"name": secret_path}
+    ).payload.data.decode("utf-8")
+
+
+if not firebase_admin._apps:
+    firebase_json = get_secret("FIREBASEID")
+    cred = credentials.Certificate(json.loads(firebase_json))
+    firebase_admin.initialize_app(cred)
+
+
+# Protecting the endpoints
+from functools import wraps
+def login_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if "uid" not in session:
+            return jsonify({"success": False, "error": "Not logged in"}), 401
+        return fn(*args, **kwargs)
+    return wrapper
+
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
+
 @app.route("/api/logs")
+@login_required
 def get_logs():
     logs = list(mongo_db["order_logs"].find({}, {"_id": 0}))
     return jsonify(logs)
 
-#test
+
+# test
 @app.route("/test-mongo")
 def test_mongo():
     try:
-        # Get collections
         collections = mongo_db.list_collection_names()
-
-        # Try reading one document from order_logs
         first_log = mongo_db["order_logs"].find_one({}, {"_id": 0})
 
         return {
             "connected": True,
             "collections": collections,
-            "sample_log": first_log
+            "sample_log": first_log,
         }
     except Exception as e:
         return {"connected": False, "error": str(e)}
-#end test
+# end test
+
 
 @app.route("/api/menu", methods=["GET"])
 def get_menu():
     try:
         conn = mysql_engine.connect()
         result = conn.execute(text("SELECT id, name, price FROM menu"))
-        menu_items = [dict(row) for row in result]
+        menu_items = [dict(r._mapping) for r in result]
         conn.close()
 
         return jsonify({
@@ -51,7 +85,9 @@ def get_menu():
             "error": str(e)
         }), 500
 
+
 @app.route("/api/order", methods=["POST"])
+@login_required
 def create_order():
     try:
         data = request.get_json()
@@ -97,7 +133,11 @@ def create_order():
                         INSERT INTO order_items (order_id, menu_id, quantity)
                         VALUES (:order_id, :menu_id, :quantity)
                     """),
-                    {"order_id": order_id, "menu_id": menu_id, "quantity": quantity}
+                    {
+                        "order_id": order_id,
+                        "menu_id": menu_id,
+                        "quantity": quantity
+                    }
                 )
 
             conn.execute(
@@ -144,7 +184,7 @@ def get_order(order_id: int):
         items_result = conn.execute(
             text("""
                 SELECT oi.menu_id, m.name, m.price, oi.quantity,
-                    (m.price * oi.quantity) AS line_total
+                       (m.price * oi.quantity) AS line_total
                 FROM order_items oi
                 JOIN menu m ON m.id = oi.menu_id
                 WHERE oi.order_id = :order_id
@@ -152,11 +192,12 @@ def get_order(order_id: int):
             {"order_id": order_id}
         )
 
-
         items = [dict(r._mapping) for r in items_result]
         conn.close()
 
-        logs = list(mongo_db["order_logs"].find({"order_id": order_id}, {"_id": 0}))
+        logs = list(
+            mongo_db["order_logs"].find({"order_id": order_id}, {"_id": 0})
+        )
 
         return jsonify({
             "success": True,
@@ -170,6 +211,49 @@ def get_order(order_id: int):
             "success": False,
             "error": str(e)
         }), 500
+
+
+@app.route("/login")
+def login_page():
+    return render_template("login.html")
+
+
+@app.route("/sessionLogin", methods=["POST"])
+def session_login():
+    try:
+        data = request.get_json(silent=True) or {}
+        id_token = data.get("idToken")
+
+        if not id_token:
+            return jsonify({
+                "success": False,
+                "error": "Missing idToken"
+            }), 400
+
+        decoded = fb_auth.verify_id_token(id_token)
+
+        session["uid"] = decoded["uid"]
+        session["email"] = decoded.get("email")
+
+        return jsonify({"success": True})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 401
+
+
+@app.route("/whoami")
+def whoami():
+    return jsonify({
+        "uid": session.get("uid"),
+        "email": session.get("email")
+    })
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/")
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

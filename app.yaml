@@ -3,7 +3,7 @@ runtime: python312
 env_variables:
   INSTANCE_CONNECTION_NAME: "systems-design-assignment:europe-west2:restaurantapp"
   GOOGLE_CLOUD_PROJECT: "systems-design-assignment"
-
+  FLASK_SECRET_KEY: "some-long-random-string"
 entrypoint: gunicorn -b :$PORT main:app
 
 handlers:

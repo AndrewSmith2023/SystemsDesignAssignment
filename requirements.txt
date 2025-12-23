@@ -4,3 +4,5 @@ pymysql==1.1.0
 pymongo==4.6.0
 gunicorn==21.2.0
 google-cloud-secret-manager==2.16.4
+firebase-admin==6.5.0
+Flask-Session==0.8.0
