@@ -160,6 +160,31 @@ def create_order():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route("/api/orders", methods=["GET"])
+@login_required
+def list_my_orders():
+    try:
+        user_id = session.get("user_id")
+        if not user_id:
+            return jsonify({"success": False, "error": "Not logged in"}), 401
+
+        with mysql_engine.connect() as conn:
+            rows = conn.execute(
+                text("""
+                SELECT id, total, status, created_at
+                FROM orders
+                WHERE user_id = :user_id
+                ORDER BY created_at DESC                
+                """),
+                {"user_id": user_id}
+            ).fetchall()
+        
+        orders = [dict(r._mapping) for r in rows]
+        return jsonify({"success": True, "orders": orders})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 @app.route("/api/order/<int:order_id>", methods=["GET"])
 def get_order(order_id: int):
