@@ -91,10 +91,13 @@ def get_menu():
 def create_order():
     try:
         data = request.get_json()
-        user_id = data.get("user_id")
         items = data.get("items", [])
+        user_id = session.get("user_id")
 
-        if not user_id or not items:
+        if not user_id:
+            return jsonify({"success": False, "error": "User not logged in"}), 401
+
+        if not items:
             return jsonify({"success": False, "error": "Invalid request data"}), 400
 
         # commits automatically on success
@@ -179,6 +182,13 @@ def get_order(order_id: int):
                 "error": "Order not found"
             }), 404
 
+        if order_row._mapping["user_id"] != session.get("user_id"):
+            conn.close()
+            return jsonify({
+                "success": False,
+                "error": "Unauthorized"
+            }), 403
+
         order = dict(order_row._mapping)
 
         items_result = conn.execute(
@@ -232,9 +242,27 @@ def session_login():
 
         decoded = fb_auth.verify_id_token(id_token)
 
-        session["uid"] = decoded["uid"]
-        session["email"] = decoded.get("email")
+        email = decoded.get("email")
+        name = decoded.get("name")
+        if not email:
+            return jsonify({
+                "success": False,
+                "error": "No email in token"
+            }), 400
 
+
+        with mysql_engine.begin() as conn:
+            row = conn.execute(text("SELECT id FROM users WHERE email = :email"), {"email": email}).fetchone()
+
+            if row:
+                user_id = row[0]
+            else:
+                result = conn.execute(text("INSERT INTO users (email, name) VALUES (:email, :name)"), {"email": email, "name": name})
+                user_id = result.lastrowid
+
+        session["uid"] = decoded["uid"]
+        session["email"] = email
+        session["user_id"] = user_id
         return jsonify({"success": True})
 
     except Exception as e:
@@ -245,7 +273,8 @@ def session_login():
 def whoami():
     return jsonify({
         "uid": session.get("uid"),
-        "email": session.get("email")
+        "email": session.get("email"),
+        "user_id": session.get("user_id")
     })
 
 
