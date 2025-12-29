@@ -6,10 +6,27 @@ from db import mysql_engine, mongo_db
 from sqlalchemy import text
 from google.cloud import secretmanager
 import json
+import requests
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-not-for-prod")
 
+def send_audit_log(order_id: int, user_id: int, total):
+    url = os.getenv("AUDIT_LOG_URL")
+    if not url:
+        return
+
+    try:
+        requests.post(
+            url,
+            json={
+                "order_id": order_id,
+                "user_id": user,
+                "total": float(total)},
+                timeout=3
+        )
+    except Exception:
+        pass #Never break checkout if audit fails!
 
 def get_secret(name: str) -> str:
     project_id = os.environ["GOOGLE_CLOUD_PROJECT"]
@@ -155,6 +172,11 @@ def create_order():
             "message": "Order created"
         })
 
+        try:
+            send_audit_log(order_id, user_id, total_price)
+        except Exception as audit_err:
+            app.logger.exception("Audit log call failed: %s", audit_err)
+        
         return jsonify({"success": True, "order_id": order_id})
 
     except Exception as e:
