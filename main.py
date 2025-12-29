@@ -10,17 +10,17 @@ import requests
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-not-for-prod")
+
 def send_audit_log(order_id: int, user_id: int, total):
     url = os.getenv("AUDIT_LOG_URL")
     if not url:
         return
-
     try:
         requests.post(
             url,
             json={
                 "order_id": order_id,
-                "user_id": user,
+                "user_id": user_id,
                 "total": float(total)},
                 timeout=3
         )
@@ -52,6 +52,25 @@ def login_required(fn):
             return jsonify({"success": False, "error": "Not logged in"}), 401
         return fn(*args, **kwargs)
     return wrapper
+
+def page_login_required(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if "uid" not in session:
+            return redirect("/login")
+        return fn(*args, **kwargs)
+    return wrapper
+
+
+@app.context_processor
+def inject_user():
+    return {
+        "current_user": {
+            "email": session.get("email"),
+            "user_id": session.get("user_id"),
+            "uid": session.get("uid"),
+        } if session.get("email") else None
+    }
 
 
 @app.route("/")
@@ -355,6 +374,16 @@ def whoami():
 def logout():
     session.clear()
     return redirect("/")
+
+@app.route("/menu")
+@page_login_required
+def menu_page():
+    return render_template("menu.html")
+
+@app.route("/orders")
+@page_login_required
+def orders_page():
+    return render_template("orders.html")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+  <h1>My Orders</h1>
+  <ul id="ordersList"></ul>
+</div>
+
+<script>
+async function loadOrders() {
+  const res = await fetch("/api/orders");
+  const data = await res.json();
+  if (!data.success) return;
+
+  const ul = document.getElementById("ordersList");
+  ul.innerHTML = "";
+
+  data.orders.forEach(o => {
+    const li = document.createElement("li");
+    li.textContent = `Order #${o.id} — £${o.total} — ${o.status}`;
+    ul.appendChild(li);
+  });
+}
+
+loadOrders();
+</script>
+
+{% endblock %}

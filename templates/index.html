@@ -1,10 +1,11 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Restaurant App</title>
-</head>
-<body>
-    <h1>Restaurant Ordering System</h1>
-    <p>Your App Engine project is running.</p>
-</body>
-</html>
+{% extends "base.html" %}
+{% block content %}
+  <div class="card">
+    <h1>Welcome to the Restaurant Ordering App</h1>
+    {% if current_user %}
+      <p>You’re logged in — use the top bar to place an order or view your orders.</p>
+    {% else %}
+      <p>Please log in to place an order.</p>
+    {% endif %}
+  </div>
+{% endblock %}

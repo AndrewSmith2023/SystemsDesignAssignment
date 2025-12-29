@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title or "Restaurant App" }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<nav class="topbar">
+  <div class="topbar__inner">
+    <a class="brand" href="/">Restaurant App</a>
+
+    <div class="nav">
+      {% if current_user %}
+        <a class="nav__link" href="/menu">Place an Order</a>
+        <a class="nav__link" href="/orders">My Orders</a>
+        <a class="btn btn--ghost" href="/logout">Sign out</a>
+      {% else %}
+        <a class="btn btn--primary" href="/login">Login</a>
+      {% endif %}
+    </div>
+  </div>
+</nav>
+
+<main class="container">
+  {% block content %}{% endblock %}
+</main>
+
+</body>
+</html>

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+  <h1>Menu</h1>
+  <p>Select items to place an order.</p>
+
+  <ul id="menuList"></ul>
+  <button class="btn btn--primary" id="placeOrderBtn">Place order</button>
+</div>
+
+<script>
+async function loadMenu() {
+  const res = await fetch("/api/menu");
+  const data = await res.json();
+  if (!data.success) return;
+
+  const ul = document.getElementById("menuList");
+  ul.innerHTML = "";
+
+ data.menu.forEach(item => {
+  const li = document.createElement("li");
+
+  li.innerHTML = `
+    ${item.name} — £${item.price}
+    <input type="number" min="0" max="10" value="0" data-id="${item.id}">
+  `;
+
+  const input = li.querySelector("input");
+
+  // Enforce max = 10 in UI
+  input.addEventListener("input", () => {
+    if (Number(input.value) > 10) input.value = 10;
+    if (Number(input.value) < 0) input.value = 0;
+  });
+
+  ul.appendChild(li);
+});
+
+}
+
+document.getElementById("placeOrderBtn").onclick = async () => {
+  const inputs = document.querySelectorAll("input[data-id]");
+  const items = [...inputs]
+    .filter(i => i.value > 0)
+    .map(i => ({ menu_id: Number(i.dataset.id), quantity: Number(i.value) }));
+
+  if (!items.length) return alert("Select at least one item");
+
+  const res = await fetch("/api/order", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({ items })
+  });
+
+  const data = await res.json();
+  if (data.success) window.location.href = "/orders";
+  else alert(data.error);
+};
+
+loadMenu();
+</script>
+
+{% endblock %}
