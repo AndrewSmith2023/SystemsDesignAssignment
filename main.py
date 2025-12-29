@@ -61,7 +61,6 @@ def page_login_required(fn):
         return fn(*args, **kwargs)
     return wrapper
 
-
 @app.context_processor
 def inject_user():
     return {
@@ -72,35 +71,17 @@ def inject_user():
         } if session.get("email") else None
     }
 
+#End of endpoint protection/sanitisation
 
 @app.route("/")
 def index():
     return render_template("index.html")
-
 
 @app.route("/api/logs")
 @login_required
 def get_logs():
     logs = list(mongo_db["order_logs"].find({}, {"_id": 0}))
     return jsonify(logs)
-
-
-# test
-@app.route("/test-mongo")
-def test_mongo():
-    try:
-        collections = mongo_db.list_collection_names()
-        first_log = mongo_db["order_logs"].find_one({}, {"_id": 0})
-
-        return {
-            "connected": True,
-            "collections": collections,
-            "sample_log": first_log,
-        }
-    except Exception as e:
-        return {"connected": False, "error": str(e)}
-# end test
-
 
 @app.route("/api/menu", methods=["GET"])
 def get_menu():
@@ -120,7 +101,6 @@ def get_menu():
             "success": False,
             "error": str(e)
         }), 500
-
 
 @app.route("/api/order", methods=["POST"])
 @login_required
@@ -226,7 +206,6 @@ def list_my_orders():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
 
-
 @app.route("/api/order/<int:order_id>", methods=["GET"])
 def get_order(order_id: int):
     try:
@@ -314,11 +293,9 @@ def translate_text():
     translated = out["data"]["translations"][0]["translatedText"]
     return jsonify({"success": True, "translated": translated, "target": target})
 
-
 @app.route("/login")
 def login_page():
     return render_template("login.html")
-
 
 @app.route("/sessionLogin", methods=["POST"])
 def session_login():
@@ -360,16 +337,6 @@ def session_login():
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 401
 
-
-@app.route("/whoami")
-def whoami():
-    return jsonify({
-        "uid": session.get("uid"),
-        "email": session.get("email"),
-        "user_id": session.get("user_id")
-    })
-
-
 @app.route("/logout")
 def logout():
     session.clear()
@@ -385,6 +352,34 @@ def menu_page():
 def orders_page():
     return render_template("orders.html")
 
+# FOR DEVELOPMENT USE ONLY
+@app.route("/test-mongo")
+def test_mongo():
+    try:
+        logs_cursor = mongo_db["order_logs"].find({})
+        logs = []
+
+        for log in logs_cursor:
+            log["_id"] = str(log["_id"])  # make JSON serialisable
+            logs.append(log)
+
+        return {
+            "connected": True,
+            "collections": mongo_db.list_collection_names(),
+            "count": len(logs),
+            "logs": logs
+        }
+
+    except Exception as e:
+        return {"connected": False, "error": str(e)}, 500
+
+@app.route("/whoami")
+def whoami():
+    return jsonify({
+        "uid": session.get("uid"),
+        "email": session.get("email"),
+        "user_id": session.get("user_id")
+    })
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
