@@ -1,12 +1,15 @@
 import os
-from flask import Flask, render_template, jsonify, request, session, redirect, make_response
+import json
+
+import requests
 import firebase_admin
 from firebase_admin import auth as fb_auth, credentials
-from db import mysql_engine, mongo_db
-from sqlalchemy import text
 from google.cloud import secretmanager
-import json
-import requests
+from sqlalchemy import text
+from flask import Flask, render_template, jsonify, request, session, redirect
+
+from db import mysql_engine, mongo_db
+
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-not-for-prod")
