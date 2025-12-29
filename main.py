@@ -10,7 +10,6 @@ import requests
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-not-for-prod")
-
 def send_audit_log(order_id: int, user_id: int, total):
     url = os.getenv("AUDIT_LOG_URL")
     if not url:
@@ -35,6 +34,7 @@ def get_secret(name: str) -> str:
     return client.access_secret_version(
         request={"name": secret_path}
     ).payload.data.decode("utf-8")
+TRANSLATE_API_KEY = get_secret("TRANSLATE_API_KEY")
 
 
 if not firebase_admin._apps:
@@ -268,6 +268,32 @@ def get_order(order_id: int):
             "success": False,
             "error": str(e)
         }), 500
+
+@app.route("/api/translate", methods=["POST"])
+@login_required
+def translate_text():
+    data = request.get_json(silent=True) or {}
+    text_in = data.get("text", "")
+    target = data.get("target", "es") #spanish
+
+    if not text_in.strip():
+        return jsonify({
+            "success": False,
+            "error": "No text to translate"
+        }), 400
+
+    Translation_Key = TRANSLATE_API_KEY.strip()
+
+    url = f"https://translation.googleapis.com/language/translate/v2?key={Translation_Key}"
+    payload = {"q": text_in, "target": target}
+
+    r = requests.post(url, json=payload, timeout=10)
+    if r.status_code != 200:
+        return jsonify({"success": False, "error": r.text}), 502
+
+    out = r.json()
+    translated = out["data"]["translations"][0]["translatedText"]
+    return jsonify({"success": True, "translated": translated, "target": target})
 
 
 @app.route("/login")
