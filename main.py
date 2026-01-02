@@ -82,6 +82,10 @@ def inject_user():
         } if session.get("email") else None
     }
 
+@app.context_processor
+def inject_admin_flag():
+    return {"is_admin": is_admin()}
+
 #End of endpoint protection/sanitisation
 
 @app.route("/")
@@ -312,6 +316,68 @@ def get_order(order_id: int):
             "success": False,
             "error": str(e)
         }), 500
+
+@app.route("/api/order/<int:order_id>/status", methods=["PATCH"])
+@login_required
+def update_order_status(order_id: int):
+    if not is_admin():
+        return jsonify({"success": False, "error": "Admin only"}), 403
+
+    data = request.get_json(silent=True) or {}
+    new_status = (data.get("status") or "").strip().lower()
+
+    allowed = {"pending", "confirmed", "completed"}
+    if new_status not in allowed:
+        return jsonify({"success": False, "error": f"Invalid status. Allowed: {sorted(allowed)}"}), 400
+
+    with mysql_engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT id, status FROM orders WHERE id = :id"),
+            {"id": order_id}
+        ).fetchone()
+
+        if not row:
+            return jsonify({"success": False, "error": "Order not found"}), 404
+
+        conn.execute(
+            text("UPDATE orders SET status = :status WHERE id = :id"),
+            {"status": new_status, "id": order_id}
+        )
+
+    # Optional: log status change in Mongo for audit trail
+    mongo_db["order_logs"].insert_one({
+        "order_id": order_id,
+        "user_id": session.get("user_id"),
+        "message": f"Admin set status to {new_status}",
+        "status": new_status
+    })
+
+    return jsonify({"success": True, "order_id": order_id, "status": new_status})
+
+@app.route("/admin/orders")
+@page_login_required
+def admin_orders_page():
+    if not is_admin():
+        return redirect("/")
+    return render_template("admin_orders.html")
+
+@app.route("/api/admin/orders", methods=["GET"])
+@login_required
+def admin_list_orders():
+    if not is_admin():
+        return jsonify({"success": False, "error": "Admin only"}), 403
+
+    with mysql_engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT o.id, o.user_id, u.email, o.total, o.status, o.created_at
+            FROM orders o
+            JOIN users u ON u.id = o.user_id
+            ORDER BY o.created_at DESC
+        """)).fetchall()
+
+    orders = [dict(r._mapping) for r in rows]
+    return jsonify({"success": True, "orders": orders})
+
 
 @app.route("/api/translate", methods=["POST"])
 @login_required

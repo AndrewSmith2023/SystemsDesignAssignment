@@ -251,3 +251,11 @@ p{ margin: 0 0 14px; color: var(--muted); }
 .order-item-name{ font-weight: 650; }
 .order-item-qty{ color: var(--muted); text-align: right; }
 .order-item-price{ text-align: right; font-weight: 700; }
+
+.admin-actions{
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card">
+  <h1>Admin: Orders</h1>
+  <p>Confirm pending orders and mark completed.</p>
+
+  <div id="wrap" class="orders-wrap"></div>
+  <div id="msg" class="status status--muted" style="margin-top:12px;">Loading…</div>
+</div>
+
+<script>
+const wrap = document.getElementById("wrap");
+const msg  = document.getElementById("msg");
+
+function fmtGBP(n){ return "£" + Number(n).toFixed(2); }
+
+function renderOrder(o){
+  const created = o.created_at ? new Date(o.created_at).toLocaleString() : "";
+  const canConfirm = (o.status || "").toLowerCase() === "pending";
+  const canComplete = (o.status || "").toLowerCase() === "confirmed";
+
+  const div = document.createElement("div");
+  div.className = "order-card";
+  div.innerHTML = `
+    <div class="order-head">
+      <div>
+        <div class="order-title">Order #${o.id}</div>
+        <div class="order-meta">${created} • ${o.email}</div>
+      </div>
+      <div class="order-right">
+        <span class="badge">${o.status}</span>
+        <strong>${fmtGBP(o.total)}</strong>
+      </div>
+    </div>
+
+    <div class="admin-actions">
+      <button class="btn btn--primary" ${canConfirm ? "" : "disabled"} data-action="confirm">Confirm</button>
+      <button class="btn btn--ghost" ${canComplete ? "" : "disabled"} data-action="complete">Complete</button>
+      <span class="status status--muted" data-status>
+       Current: ${o.status}
+      </span>
+    </div>
+  `;
+
+  div.querySelectorAll("button").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const action = btn.dataset.action;
+      const newStatus = action === "confirm" ? "confirmed" : "completed";
+      const statusEl = div.querySelector("[data-status]");
+      statusEl.textContent = "Updating…";
+
+      const res = await fetch(`/api/order/${o.id}/status`, {
+        method: "PATCH",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        statusEl.textContent = `Current: ${newStatus}`;
+        await load(); // refresh list
+      } else {
+        statusEl.textContent = data.error || "Failed";
+      }
+    });
+  });
+
+  return div;
+}
+
+async function load(){
+  wrap.innerHTML = "";
+  msg.textContent = "Loading…";
+
+  const res = await fetch("/api/admin/orders");
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || !data.success) {
+    msg.textContent = data.error || "Failed to load.";
+    return;
+  }
+
+  const orders = data.orders || [];
+  if (!orders.length) {
+    msg.textContent = "No orders found.";
+    return;
+  }
+
+  msg.textContent = "";
+  orders.forEach(o => wrap.appendChild(renderOrder(o)));
+}
+
+load();
+</script>
+
+{% endblock %}

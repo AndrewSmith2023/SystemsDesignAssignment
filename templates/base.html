@@ -17,6 +17,11 @@
         <a class="nav__link" href="/menu">Place an Order</a>
         <a class="nav__link" href="/orders">My Orders</a>
         <a class="btn btn--ghost" href="/logout">Sign out</a>
+        {% if is_admin %}
+          <a class="nav__link" href="/admin/orders">Admin</a>
+        {% endif %}
+
+
       {% else %}
         <a class="btn btn--primary" href="/login">Login</a>
       {% endif %}
