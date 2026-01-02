@@ -19,6 +19,7 @@ function renderOrder(o){
   const created = o.created_at ? new Date(o.created_at).toLocaleString() : "";
   const canConfirm = (o.status || "").toLowerCase() === "pending";
   const canComplete = (o.status || "").toLowerCase() === "confirmed";
+  const canDelete = (o.status || "").toLowerCase() === "completed";
 
   const div = document.createElement("div");
   div.className = "order-card";
@@ -37,6 +38,7 @@ function renderOrder(o){
     <div class="admin-actions">
       <button class="btn btn--primary" ${canConfirm ? "" : "disabled"} data-action="confirm">Confirm</button>
       <button class="btn btn--ghost" ${canComplete ? "" : "disabled"} data-action="complete">Complete</button>
+      <button class="btn btn--ghost" ${canDelete ? "" : "disabled"} data-action="delete">Delete</button>
       <span class="status status--muted" data-status>
        Current: ${o.status}
       </span>
@@ -45,25 +47,50 @@ function renderOrder(o){
 
   div.querySelectorAll("button").forEach(btn => {
     btn.addEventListener("click", async () => {
-      const action = btn.dataset.action;
-      const newStatus = action === "confirm" ? "confirmed" : "completed";
-      const statusEl = div.querySelector("[data-status]");
-      statusEl.textContent = "Updating…";
+    const action = btn.dataset.action;
+    const statusEl = div.querySelector("[data-status]");
 
-      const res = await fetch(`/api/order/${o.id}/status`, {
+    // DELETE (hide from admin view)
+    if (action === "delete") {
+        if (!confirm(`Hide Order #${o.id} from admin view?`)) return;
+
+        statusEl.textContent = "Deleting…";
+
+        const res = await fetch(`/api/order/${o.id}/hide`, {
         method: "PATCH",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ status: newStatus })
-      });
+        headers: { "Content-Type": "application/json" }
+        });
 
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.success) {
+        const data = await res.json().catch(() => ({}));
+
+        if (res.ok && data.success) {
+        await load(); // order disappears
+        } else {
+        statusEl.textContent = data.error || "Failed";
+        }
+        return; // IMPORTANT: stop here
+    }
+
+    // CONFIRM / COMPLETE
+    const newStatus = action === "confirm" ? "confirmed" : "completed";
+    statusEl.textContent = "Updating…";
+
+    const res = await fetch(`/api/order/${o.id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus })
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok && data.success) {
         statusEl.textContent = `Current: ${newStatus}`;
         await load(); // refresh list
-      } else {
+    } else {
         statusEl.textContent = data.error || "Failed";
-      }
+    }
     });
+
   });
 
   return div;

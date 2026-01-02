@@ -372,11 +372,46 @@ def admin_list_orders():
             SELECT o.id, o.user_id, u.email, o.total, o.status, o.created_at
             FROM orders o
             JOIN users u ON u.id = o.user_id
+            WHERE o.hidden_from_admin = 0
             ORDER BY o.created_at DESC
         """)).fetchall()
 
     orders = [dict(r._mapping) for r in rows]
     return jsonify({"success": True, "orders": orders})
+
+@app.route("/api/order/<int:order_id>/hide", methods=["PATCH"])
+@login_required
+def hide_order_from_admin(order_id: int):
+    if not is_admin():
+        return jsonify({"success": False, "error": "Admin only"}), 403
+
+    with mysql_engine.begin() as conn:
+        row = conn.execute(
+            text("SELECT status, hidden_from_admin FROM orders WHERE id = :id"),
+            {"id": order_id}
+        ).fetchone()
+
+        if not row:
+            return jsonify({"success": False, "error": "Order not found"}), 404
+
+        status = (row._mapping["status"] or "").lower()
+        if status != "completed":
+            return jsonify({"success": False, "error": "Only completed orders can be deleted from admin view"}), 400
+
+        conn.execute(
+            text("UPDATE orders SET hidden_from_admin = 1 WHERE id = :id"),
+            {"id": order_id}
+        )
+
+    # optional audit trail in Mongo
+    mongo_db["order_logs"].insert_one({
+        "order_id": order_id,
+        "user_id": session.get("user_id"),
+        "message": "Admin hid order from admin view",
+        "action": "hide_from_admin"
+    })
+
+    return jsonify({"success": True, "order_id": order_id})
 
 
 @app.route("/api/translate", methods=["POST"])
