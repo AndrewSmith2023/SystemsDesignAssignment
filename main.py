@@ -39,6 +39,14 @@ def get_secret(name: str) -> str:
     ).payload.data.decode("utf-8")
 TRANSLATE_API_KEY = get_secret("TRANSLATE_API_KEY")
 
+def is_admin() -> bool:
+    admin_emails = [
+        e.strip().lower()
+        for e in (os.getenv("ADMIN_EMAIL") or "").split(",")
+        if e.strip()
+    ]
+    return (session.get("email") or "").lower() in admin_emails
+
 
 if not firebase_admin._apps:
     firebase_json = get_secret("FIREBASEID")
@@ -383,9 +391,7 @@ def logout():
 @app.route("/menu")
 @page_login_required
 def menu_page():
-    admin_emails = [e.strip().lower() for e in (os.getenv("ADMIN_EMAIL") or "").split(",") if e.strip()]
-    is_admin = (session.get("email") or "").lower() in admin_emails
-    return render_template("menu.html", is_admin=is_admin)
+    return render_template("menu.html", is_admin=is_admin())
 
 @app.route("/orders")
 @page_login_required
