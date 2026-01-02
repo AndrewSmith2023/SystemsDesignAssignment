@@ -187,3 +187,67 @@ p{ margin: 0 0 14px; color: var(--muted); }
 #menuList input[type="number"]{
   width: 80px;
 }
+
+.orders-wrap{
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.order-card{
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255,255,255,.03);
+  padding: 12px;
+}
+
+.order-head{
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.order-title{ font-weight: 800; }
+.order-meta{ color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+.order-right{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.badge{
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.04);
+  color: var(--muted);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.order-body{ margin-top: 10px; }
+
+.order-items{
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.order-item-row{
+  display: grid;
+  grid-template-columns: 1fr 60px 90px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: rgba(0,0,0,.10);
+}
+
+.order-item-name{ font-weight: 650; }
+.order-item-qty{ color: var(--muted); text-align: right; }
+.order-item-price{ text-align: right; font-weight: 700; }

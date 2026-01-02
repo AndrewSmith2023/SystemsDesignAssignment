@@ -244,6 +244,7 @@ def list_my_orders():
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route("/api/order/<int:order_id>", methods=["GET"])
+@login_required
 def get_order(order_id: int):
     try:
         conn = mysql_engine.connect()

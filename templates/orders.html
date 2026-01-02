@@ -3,23 +3,99 @@
 
 <div class="card">
   <h1>My Orders</h1>
-  <ul id="ordersList"></ul>
+  <p>Your recent orders, with the items inside each one.</p>
+
+  <div id="ordersWrap" class="orders-wrap"></div>
+
+  <div id="ordersMsg" class="status status--muted" style="margin-top:12px;">
+    Loading…
+  </div>
 </div>
 
 <script>
-async function loadOrders() {
+const wrap = document.getElementById("ordersWrap");
+const msg  = document.getElementById("ordersMsg");
+
+function fmtGBP(n){ return "£" + Number(n).toFixed(2); }
+
+function orderHeaderHtml(o){
+  const created = o.created_at ? new Date(o.created_at).toLocaleString() : "";
+  return `
+    <div class="order-head">
+      <div>
+        <div class="order-title">Order #${o.id}</div>
+        <div class="order-meta">${created}</div>
+      </div>
+      <div class="order-right">
+        <span class="badge">${o.status}</span>
+        <strong>${fmtGBP(o.total)}</strong>
+      </div>
+    </div>
+  `;
+}
+
+function itemsHtml(items){
+  if (!items || !items.length) return `<div class="order-items muted">No items found.</div>`;
+
+  const rows = items.map(i => `
+    <div class="order-item-row">
+      <div class="order-item-name">${i.name}</div>
+      <div class="order-item-qty">x${i.quantity}</div>
+      <div class="order-item-price">${fmtGBP(i.line_total)}</div>
+    </div>
+  `).join("");
+
+  return `<div class="order-items">${rows}</div>`;
+}
+
+async function loadOrders(){
+  wrap.innerHTML = "";
+  msg.textContent = "Loading…";
+
   const res = await fetch("/api/orders");
-  const data = await res.json();
-  if (!data.success) return;
+  const data = await res.json().catch(() => ({}));
 
-  const ul = document.getElementById("ordersList");
-  ul.innerHTML = "";
+  if (!res.ok || !data.success) {
+    msg.textContent = data.error || "Failed to load orders.";
+    return;
+  }
 
-  data.orders.forEach(o => {
-    const li = document.createElement("li");
-    li.textContent = `Order #${o.id} — £${o.total} — ${o.status}`;
-    ul.appendChild(li);
-  });
+  const orders = data.orders || [];
+  if (!orders.length) {
+    msg.textContent = "No orders yet.";
+    return;
+  }
+
+  msg.textContent = "";
+
+  // Render order shells first (fast)
+  for (const o of orders) {
+    const card = document.createElement("div");
+    card.className = "order-card";
+    card.innerHTML = `
+      ${orderHeaderHtml(o)}
+      <div class="order-body">
+        <div class="status status--muted">Loading items…</div>
+      </div>
+    `;
+    wrap.appendChild(card);
+
+    // Then fetch items for each order
+    try {
+      const dres = await fetch(`/api/order/${o.id}`);
+      const d = await dres.json().catch(() => ({}));
+      const body = card.querySelector(".order-body");
+
+      if (dres.ok && d.success) {
+        body.innerHTML = itemsHtml(d.items);
+      } else {
+        body.innerHTML = `<div class="status status--error">${d.error || "Failed to load items."}</div>`;
+      }
+    } catch (e) {
+      const body = card.querySelector(".order-body");
+      body.innerHTML = `<div class="status status--error">Failed to load items.</div>`;
+    }
+  }
 }
 
 loadOrders();
