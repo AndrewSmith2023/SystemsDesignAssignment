@@ -15,7 +15,7 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "dev-not-for-prod")
 
 def send_audit_log(order_id: int, user_id: int, total):
-    url = os.getenv("AUDIT_LOG_URL")
+    url = os.getenv("AUDIT_FUNCTION_URL")
     if not url:
         return
     try:
