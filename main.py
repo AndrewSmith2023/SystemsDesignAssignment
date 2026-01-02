@@ -105,6 +105,40 @@ def get_menu():
             "error": str(e)
         }), 500
 
+@app.route("/api/menu", methods=["POST"])
+@login_required
+def add_menu_item():
+    # Admin check (comma-separated allowed emails)
+    admin_emails = [e.strip().lower() for e in (os.getenv("ADMIN_EMAIL") or "").split(",") if e.strip()]
+    if (session.get("email") or "").lower() not in admin_emails:
+        return jsonify({"success": False, "error": "Admin only"}), 403
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    price = data.get("price")
+
+    if not name:
+        return jsonify({"success": False, "error": "Name is required"}), 400
+
+    try:
+        price = float(price)
+        if price <= 0:
+            raise ValueError()
+    except Exception:
+        return jsonify({"success": False, "error": "Price must be a positive number"}), 400
+
+    with mysql_engine.begin() as conn:
+        result = conn.execute(
+            text("INSERT INTO menu (name, price) VALUES (:name, :price)"),
+            {"name": name, "price": price}
+        )
+        new_id = result.lastrowid
+
+    return jsonify({"success": True, "id": new_id, "name": name, "price": price})
+
+
+
+
 @app.route("/api/order", methods=["POST"])
 @login_required
 def create_order():
@@ -348,7 +382,9 @@ def logout():
 @app.route("/menu")
 @page_login_required
 def menu_page():
-    return render_template("menu.html")
+    admin_emails = [e.strip().lower() for e in (os.getenv("ADMIN_EMAIL") or "").split(",") if e.strip()]
+    is_admin = (session.get("email") or "").lower() in admin_emails
+    return render_template("menu.html", is_admin=is_admin)
 
 @app.route("/orders")
 @page_login_required
@@ -383,6 +419,13 @@ def whoami():
         "email": session.get("email"),
         "user_id": session.get("user_id")
     })
+
+@app.route("/debug/admin")
+def debug_admin():
+    return {
+        "session_email": session.get("email"),
+        "ADMIN_EMAIL": os.getenv("ADMIN_EMAIL")
+    }
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)

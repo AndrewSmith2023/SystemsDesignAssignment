@@ -5,9 +5,29 @@
   <h1>Menu</h1>
   <p>Select items to place an order.</p>
 
+  {% if is_admin %}
+  <div class="admin-card">
+    <div class="admin-card__title">Admin: Add menu item</div>
+
+    <div class="admin-form">
+      <input id="newName" class="input" placeholder="Item name">
+      <input id="newPrice" class="input" type="number" min="0" step="0.01" placeholder="Price">
+      <button id="addItemBtn" class="btn btn--primary" type="button">Add</button>
+    </div>
+
+    <div id="adminMsg" class="status status--muted" style="margin-top:10px;">
+      Only admins can see this.
+    </div>
+  </div>
+  {% endif %}
+
   <ul id="menuList"></ul>
-  <button class="btn btn--primary" id="placeOrderBtn">Place order</button>
+
+  <button class="btn btn--primary" id="placeOrderBtn">
+    Place order
+  </button>
 </div>
+
 
 <script>
 async function loadMenu() {
@@ -22,7 +42,7 @@ async function loadMenu() {
   const li = document.createElement("li");
 
   li.innerHTML = `
-    ${item.name} — £${item.price}
+    ${item.name} — £${Number(item.price).toFixed(2)}
     <input type="number" min="0" max="10" value="0" data-id="${item.id}">
   `;
 
@@ -43,7 +63,10 @@ document.getElementById("placeOrderBtn").onclick = async () => {
   const inputs = document.querySelectorAll("input[data-id]");
   const items = [...inputs]
     .filter(i => i.value > 0)
-    .map(i => ({ menu_id: Number(i.dataset.id), quantity: Number(i.value) }));
+    .map(i => ({
+      menu_id: Number(i.dataset.id),
+      quantity: Math.max(0, Math.min(10, Number(i.value)))
+    }));
 
   if (!items.length) return alert("Select at least one item");
 
@@ -59,6 +82,46 @@ document.getElementById("placeOrderBtn").onclick = async () => {
 };
 
 loadMenu();
+
+const addBtn = document.getElementById("addItemBtn");
+
+if (addBtn) {
+  const nameEl = document.getElementById("newName");
+  const priceEl = document.getElementById("newPrice");
+  const adminMsg = document.getElementById("adminMsg");
+
+  addBtn.addEventListener("click", async () => {
+    const name = (nameEl.value || "").trim();
+    const price = priceEl.value;
+
+    if (!name) return adminMsg.textContent = "Name is required.";
+    if (!price || Number(price) <= 0)
+      return adminMsg.textContent = "Price must be a positive number.";
+
+    addBtn.disabled = true;
+    adminMsg.textContent = "Adding…";
+
+    const res = await fetch("/api/menu", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, price })
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok && data.success) {
+      adminMsg.textContent = `Added: ${data.name}`;
+      nameEl.value = "";
+      priceEl.value = "";
+      loadMenu(); // refresh menu
+    } else {
+      adminMsg.textContent = data.error || "Failed to add item.";
+    }
+
+    addBtn.disabled = false;
+  });
+}
+
 </script>
 
 {% endblock %}

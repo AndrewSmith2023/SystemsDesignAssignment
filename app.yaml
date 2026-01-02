@@ -5,7 +5,7 @@ env_variables:
   GOOGLE_CLOUD_PROJECT: "systems-design-assignment"
   FLASK_SECRET_KEY: "some-long-random-string"
   AUDIT_FUNCTION_URL: "https://order-audit-log-390833686250.europe-west1.run.app"
-  
+  ADMIN_EMAIL: "andrewdarrensmith@gmail.com"
 entrypoint: gunicorn -b :$PORT main:app
 
 handlers:
