@@ -37,7 +37,10 @@ def get_secret(name: str) -> str:
     return client.access_secret_version(
         request={"name": secret_path}
     ).payload.data.decode("utf-8")
-TRANSLATE_API_KEY = get_secret("TRANSLATE_API_KEY")
+
+def get_translate_key() -> str:
+    return get_secret("TRANSLATE_API_KEY").strip()
+
 
 def is_admin() -> bool:
     admin_emails = [
@@ -427,7 +430,7 @@ def translate_text():
             "error": "No text to translate"
         }), 400
 
-    Translation_Key = TRANSLATE_API_KEY.strip()
+    Translation_Key = get_translate_key()
 
     url = f"https://translation.googleapis.com/language/translate/v2?key={Translation_Key}"
     payload = {"q": text_in, "target": target}
