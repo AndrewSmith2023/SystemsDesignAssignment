@@ -345,7 +345,7 @@ def update_order_status(order_id: int):
         )
 
     # Optional: log status change in Mongo for audit trail
-    mongo_db["order_logs"].insert_one({
+        mongo_db["order_logs"].insert_one({
         "order_id": order_id,
         "user_id": session.get("user_id"),
         "message": f"Admin set status to {new_status}",
@@ -498,6 +498,11 @@ def menu_page():
 @page_login_required
 def orders_page():
     return render_template("orders.html")
+
+@app.route("/translate")
+@page_login_required
+def translate_page():
+    return render_template("translate.html")
 
 # FOR DEVELOPMENT USE ONLY
 @app.route("/test-mongo")
